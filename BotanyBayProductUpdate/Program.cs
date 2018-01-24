@@ -4,6 +4,7 @@ using System.Text;
 using cwbx;
 using System.Data.Odbc;
 using System.IO;
+using CsvHelper;
 namespace BotanyBayProductUpdate
 {
     class Program
@@ -32,42 +33,38 @@ namespace BotanyBayProductUpdate
                 program.LibraryName = "SILIB";
                 program.ProgramName = "BOTBAY01";
                 program.system = system;
-              
+
 
                 //Finally call the program
 
                 try
                 {
                     // program.Call();
-                  
-                   using (OdbcConnection conn = new OdbcConnection("Driver={iseries access odbc driver};system=s654d1bb;uid=PCS400;pwd=PCS400;"))
+
+                    using (OdbcConnection conn = new OdbcConnection("Driver={iseries access odbc driver};system=s654d1bb;uid=PCS400;pwd=PCS400;"))
                     {
                         OdbcCommand command = new OdbcCommand("select * from silib.botbay01up", conn);
                         conn.Open();
                         OdbcDataReader reader = command.ExecuteReader();
-                       
-                        while (reader.Read())
-                        {
-                            Console.WriteLine("barcode={0}", reader[0]);
-                            Console.WriteLine("price={0}", reader[1]);
-                            Console.WriteLine("description={0}", reader[2]);
-                            Console.WriteLine("dept={0}", reader[3]);
-                        }
-                        reader.Close();
 
                         var csv = new StringBuilder();
+                        var header = string.Format("Barcode, Price, Description, Dept");
+                        var filePath = @"C:\Users\morrise\Desktop\BotBay.csv";
+                        csv.AppendLine(header);
 
-                        var first = reader[0].ToString();
-                        var second = reader[1].ToString();
-                        var third = reader[2].ToString();
-                        var fourth = reader[3].ToString();
-
-                        var newLine = string.Format("{0},{1}", first, second, third, fourth);
-
-                        string filePath = "C:\\Users\\morrise\\Desktop";
-
+                        while (reader.Read())
+                        {
+                            
+                            Console.WriteLine("Barcode = {0} Price = {0} Description = {0} Dept = {0} ", reader[0],  reader[1], reader[2], reader[3]);
+                            var first = reader[0].ToString();
+                            var second = reader[1].ToString();
+                            var third = reader[2].ToString();
+                            var fourth = reader[3].ToString();
+                            var newLine = string.Format("{0}, {1}, {2}, {3}", first, second, third, fourth);                            
+                            csv.AppendLine(newLine);
+                        }
                         File.WriteAllText(filePath, csv.ToString());
-                    }                                        
+                    }    
                 }
                 catch (Exception ex)
                 {
@@ -89,11 +86,7 @@ namespace BotanyBayProductUpdate
                 } 
             }
             system.Disconnect(cwbcoServiceEnum.cwbcoServiceAll);
-            Console.WriteLine("Done");
             Console.ReadKey();
-        }
-
-      
-
-    }
+        }             
+     }
 }
