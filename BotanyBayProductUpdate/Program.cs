@@ -16,7 +16,7 @@ namespace BotanyBayProductUpdate
         static void Main(string[] args)
         {
             //properties for sending mail
-            MailMessage mail = new MailMessage("elliot.morris@wsg.co.uk", "elliotmorris115@gmail.com");
+            MailMessage mail = new MailMessage("elliot.morris@wsg.co.uk", "elliot.morris@wsg.co.uk");
             SmtpClient client = new SmtpClient
             {
                 Port = 25,
@@ -56,7 +56,7 @@ namespace BotanyBayProductUpdate
                 //call the program
                 try
                 {
-                    // program.Call();
+                   //  program.Call();
                     logger.Info("program called on as400");
                     //creating a odbc connection to the as400
                     using (OdbcConnection conn = new OdbcConnection("Driver={iseries access odbc driver};system=s654d1bb;uid=PCS400;pwd=PCS400;"))
@@ -65,15 +65,17 @@ namespace BotanyBayProductUpdate
                         conn.Open();
                         OdbcDataReader reader = command.ExecuteReader();
                         logger.Info("connection made to as400 via odbc");
-                        var csv = new StringBuilder();
+                        var csv = new StringBuilder();                      
                         //header string
                         var header = string.Format("Barcode, Price, Description, Dept");
                         //appending the headers
-                        csv.AppendLine(header);
+                       
+                       
                         logger.Info("Appending headers to the csv");
                         while (reader.Read())
                         {                            
                             Console.WriteLine("Barcode = {0} Price = {0} Description = {0} Dept = {0} ", reader[0],  reader[1], reader[2], reader[3]);
+                           
                             //reading in the values into the csv
                             var first = reader[0].ToString();
                             var second = reader[1].ToString();
@@ -82,11 +84,31 @@ namespace BotanyBayProductUpdate
                             //creating the string format
                             var newLine = string.Format("{0}, {1}, {2}, {3}", first, second, third, fourth);
                             //appending the values
+                            csv.AppendLine(header);
                             csv.AppendLine(newLine);
                             logger.Info("Appending data to csv");
                         }
+                        if (csv.Length > 1)
+                        {
                             File.WriteAllText(filePath + fileName, csv.ToString());
                             logger.Info("File created" + fileName);
+                            fileCsv = new Attachment(filePath + fileName);
+                            mail.Subject = "BotBay product update ";
+                            mail.Body = "Hi, \n Please see the csv file attached. ";
+                            mail.Attachments.Add(fileCsv);
+                            client.Send(mail);
+                            Console.WriteLine("Mail sent");
+                            logger.Info("Mail sent with attachment");
+                        }
+                        else
+                        {
+                            mail.Subject = "BotBay product update (No updates)";
+                            mail.Body = "There are no new upates today. ";
+                            client.Send(mail);
+                            Console.WriteLine("Csv is empty");
+                            logger.Info("Mail sent no updates so no attachment");
+                        }
+
                     }                   
                  }
                     catch (Exception ex)
@@ -109,25 +131,8 @@ namespace BotanyBayProductUpdate
                             }
                         }
                     } 
-                }
-                if (filePath.Length >= 1)
-                {
-                    fileCsv = new Attachment(filePath + fileName);
-                    mail.Subject = "BotBay product update ";
-                    mail.Body = "Hi, \n Please see the csv file attached. ";
-                    mail.Attachments.Add(fileCsv);
-                    client.Send(mail);
-                    Console.WriteLine("Mail sent");
-                    logger.Info("Mail sent with attachment");
-                }
-                else
-                {
-                    mail.Subject = "BotBay product update (No updates)";
-                    mail.Body = "There are no new upates today. ";
-                    client.Send(mail);
-                    Console.WriteLine("Csv is empty");
-                logger.Info("Mail sent no updates so no attachment");
-                }
+                }           
+             
                 //closing connection
                 system.Disconnect(cwbcoServiceEnum.cwbcoServiceAll);
                 logger.Info("Connection has been disconneted");
