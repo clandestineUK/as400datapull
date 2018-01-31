@@ -1,10 +1,11 @@
 ﻿using System;
-using System.Text;
 using System.Data.Odbc;
 using System.IO;
 using System.Net.Mail;
 using cwbx;
 using NLog;
+using Excel = Microsoft.Office.Interop.Excel;
+using OfficeOpenXml.FormulaParsing.Excel.Functions.Text;
 
 namespace BotanyBayProductUpdate
 {
@@ -27,7 +28,7 @@ namespace BotanyBayProductUpdate
             Attachment fileCsv;
             logger.Info("Connection to smtp");
             //File path location
-            var fileName = "BotBayUpdate " + DateTime.Now.ToString("dd-MM-yyyy") + ".csv";
+            var fileName = "DoubleTWO_3860_Products_" + DateTime.Now.ToString("yyyy-MM-dd") + ".xlsx";
             var filePath = @"C:\Users\morrise\Desktop\";
 
             string result = string.Empty;
@@ -40,6 +41,14 @@ namespace BotanyBayProductUpdate
             system.Password = "PCS400";
             system.IPAddress = "192.20.20.27";
             system.Connect(cwbcoServiceEnum.cwbcoServiceRemoteCmd);
+
+            //Setup xlsx file
+            Excel.Application oApp;
+            Excel.Worksheet oSheet;
+            Excel.Workbook oBook;
+            oApp = new Excel.Application();
+            oBook = oApp.Workbooks.Add();
+            oSheet = (Excel.Worksheet)oBook.Worksheets.get_Item(1);
 
             //Check connection
             if (system.IsConnected(cwbcoServiceEnum.cwbcoServiceRemoteCmd) == 1)
@@ -56,60 +65,72 @@ namespace BotanyBayProductUpdate
                 //call the program
                 try
                 {
-                   //  program.Call();
+                  //  program.Call();
                     logger.Info("program called on as400");
                     //creating a odbc connection to the as400
                     using (OdbcConnection conn = new OdbcConnection("Driver={iseries access odbc driver};system=s654d1bb;uid=PCS400;pwd=PCS400;"))
                     {
-                        OdbcCommand command = new OdbcCommand("select * from silib.botbay01up", conn);
+                        OdbcCommand command = new OdbcCommand("select * from silib.botbay01up where budept = '3860' order by bubarcode", conn);
                         conn.Open();
                         OdbcDataReader reader = command.ExecuteReader();
                         logger.Info("connection made to as400 via odbc");
-                        var csv = new StringBuilder();                      
-                        //header string
-                        var header = string.Format("Barcode, Price, Description, Dept");
-                        //appending the headers
-                       
-                       
-                        logger.Info("Appending headers to the csv");
-                        while (reader.Read())
-                        {                            
-                            Console.WriteLine("Barcode = {0} Price = {0} Description = {0} Dept = {0} ", reader[0],  reader[1], reader[2], reader[3]);
-                           
-                            //reading in the values into the csv
-                            var first = reader[0].ToString();
-                            var second = reader[1].ToString();
-                            var third = reader[2].ToString();
-                            var fourth = reader[3].ToString();
-                            //creating the string format
-                            var newLine = string.Format("{0}, {1}, {2}, {3}", first, second, third, fourth);
-                            //appending the values
-                            csv.AppendLine(header);
-                            csv.AppendLine(newLine);
-                            logger.Info("Appending data to csv");
-                        }
-                        if (csv.Length > 1)
+
+                        if (reader.HasRows == true)
                         {
-                            File.WriteAllText(filePath + fileName, csv.ToString());
-                            logger.Info("File created" + fileName);
-                            fileCsv = new Attachment(filePath + fileName);
-                            mail.Subject = "BotBay product update ";
-                            mail.Body = "Hi, \n Please see the csv file attached. ";
-                            mail.Attachments.Add(fileCsv);
-                            client.Send(mail);
-                            Console.WriteLine("Mail sent");
-                            logger.Info("Mail sent with attachment");
-                        }
+                            if (File.Exists(filePath + fileName) == true)
+                            {
+                                File.Delete(filePath + fileName);
+                            } 
+
+                            int rowNumber = 1;
+                            // column 1
+                            oSheet.Cells[rowNumber, 1] = "Barcode";
+                            oSheet.Cells[rowNumber, 1].ColumnWidth = 15;
+                            oSheet.Cells[rowNumber, 1].HorizontalAlignment = Excel.XlHAlign.xlHAlignRight;
+                            //column 2
+                            oSheet.Cells[rowNumber, 2] = "Price";
+                            oSheet.Cells[rowNumber, 2].ColumnWidth = 8;
+                            oSheet.Cells[rowNumber, 2].HorizontalAlignment = Excel.XlHAlign.xlHAlignRight;
+                            //column 3
+                            oSheet.Cells[rowNumber, 3] = "Description";
+                            oSheet.Cells[rowNumber, 3].ColumnWidth = 40;
+
+                            while (reader.Read())
+                            {
+                                Console.WriteLine("Barcode = {0} Price = {0} Description = {0}", reader[0], reader[1], reader[2]);
+
+                                rowNumber++;
+                                //column 1
+                                oSheet.Cells[rowNumber, 1] = reader[0].ToString();
+                                oSheet.Cells[rowNumber, 1].HorizontalAlignment = Excel.XlHAlign.xlHAlignRight;
+                                oSheet.Cells[rowNumber, 1].NumberFormat = "0";
+                                //column 2
+                                oSheet.Cells[rowNumber, 2] = reader[1].ToString();
+                                oSheet.Cells[rowNumber, 2].HorizontalAlignment = Excel.XlHAlign.xlHAlignRight;
+                                oSheet.Cells[rowNumber, 2].NumberFormat = "0.00";
+                                //column 3
+                                oSheet.Cells[rowNumber, 3] = reader[2].ToString();
+                                //creating the string format
+                                var newLine = string.Format("{0}, {1}, {2}", oSheet.Cells[rowNumber, 1], oSheet.Cells[rowNumber, 2], oSheet.Cells[rowNumber, 3]);
+                            }
+                          
+                                oBook.SaveAs(filePath + fileName);
+                                oBook.Close();
+                                oApp.Quit();
+                                logger.Info("File created " + fileName);
+                                fileCsv = new Attachment(filePath + fileName);
+                                mail.Subject = "Double TWO Product Update ";
+                                mail.Body = "Double TWO Product Update.";
+                                mail.Attachments.Add(fileCsv);
+                                client.Send(mail);
+                                Console.WriteLine("Mail sent");
+                                logger.Info("Mail sent with attachment");                                               
+                         }
                         else
                         {
-                            mail.Subject = "BotBay product update (No updates)";
-                            mail.Body = "There are no new upates today. ";
-                            client.Send(mail);
-                            Console.WriteLine("Csv is empty");
-                            logger.Info("Mail sent no updates so no attachment");
+                            logger.Info("No updates to send today " + DateTime.Now.ToString());
                         }
-
-                    }                   
+                    }                                          
                  }
                     catch (Exception ex)
                     {
@@ -131,8 +152,7 @@ namespace BotanyBayProductUpdate
                             }
                         }
                     } 
-                }           
-             
+                }                    
                 //closing connection
                 system.Disconnect(cwbcoServiceEnum.cwbcoServiceAll);
                 logger.Info("Connection has been disconneted");
